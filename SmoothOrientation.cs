@@ -19,6 +19,10 @@ public class SmoothOrientation : MonoBehaviour
 
     void Update()
     {
+        // Disable orientation while in spawn/preview mode
+        if (ItemSpawn.IsPreviewActive)
+            return;
+
         if (!rightHandDevice.isValid)
             rightHandDevice = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
 

@@ -18,18 +18,17 @@ public class ItemSpawn : MonoBehaviour
     public bool invertPitch = true;
     public bool invertRoll = false;
 
-    // Static counter to track how many previews are active (both hands)
     private static int activePreviews = 0;
     public static bool IsPreviewActive => activePreviews > 0;
 
-    // Private state
     private GameObject currentPreview;
     private bool isPreviewMode = false;
     private Transform cameraTransform;
     private Quaternion lastControllerRotation;
 
-    private Vector3 forwardDir;
-    private Vector3 rightDir;
+    private Vector3 forwardDir;   // horizontal camera forward at spawn
+    private Vector3 rightDir;     // horizontal camera right at spawn
+    private Vector3 upDir;        // world up (Vector3.up)
 
     private InputDevice device;
     private bool wasJoystickPressed = false;
@@ -38,7 +37,8 @@ public class ItemSpawn : MonoBehaviour
     {
         cameraTransform = Camera.main?.transform;
         if (cameraTransform == null)
-            Debug.LogError("AdvancedItemPlacer: No main camera found!");
+            Debug.LogError("ItemSpawn: No main camera found!");
+        upDir = Vector3.up;
     }
 
     void Update()
@@ -49,7 +49,6 @@ public class ItemSpawn : MonoBehaviour
         device.TryGetFeatureValue(CommonUsages.primary2DAxisClick, out bool joystickPressed);
         if (joystickPressed && !wasJoystickPressed)
         {
-            // NEW: Do not allow spawn or finalise if an object is currently selected
             if (SelectionByRay.CurrentSelected == null)
             {
                 if (!isPreviewMode)
@@ -84,24 +83,27 @@ public class ItemSpawn : MonoBehaviour
             }
             else
             {
+                // ----- ROTATION (camera‑relative axes: rightDir, upDir, forwardDir) -----
                 device.TryGetFeatureValue(CommonUsages.deviceRotation, out Quaternion currentRot);
                 Quaternion delta = currentRot * Quaternion.Inverse(lastControllerRotation);
                 Vector3 deltaEuler = delta.eulerAngles;
 
-                float yawDelta = deltaEuler.y;
-                if (yawDelta > 180f) yawDelta -= 360f;
-                if (invertYaw) yawDelta = -yawDelta;
-                currentPreview.transform.Rotate(Vector3.up, yawDelta, Space.World);
+                float yaw = deltaEuler.y;
+                if (yaw > 180f) yaw -= 360f;
+                if (invertYaw) yaw = -yaw;
 
-                float pitchDelta = deltaEuler.x;
-                if (pitchDelta > 180f) pitchDelta -= 360f;
-                if (invertPitch) pitchDelta = -pitchDelta;
-                currentPreview.transform.Rotate(Vector3.right, pitchDelta, Space.World);
+                float pitch = deltaEuler.x;
+                if (pitch > 180f) pitch -= 360f;
+                if (invertPitch) pitch = -pitch;
 
-                float rollDelta = deltaEuler.z;
-                if (rollDelta > 180f) rollDelta -= 360f;
-                if (invertRoll) rollDelta = -rollDelta;
-                currentPreview.transform.Rotate(Vector3.forward, rollDelta, Space.World);
+                float roll = deltaEuler.z;
+                if (roll > 180f) roll -= 360f;
+                if (invertRoll) roll = -roll;
+
+                // Apply rotations around captured camera‑relative axes
+                currentPreview.transform.Rotate(rightDir, pitch, Space.World);
+                currentPreview.transform.Rotate(upDir, yaw, Space.World);
+                currentPreview.transform.Rotate(forwardDir, roll, Space.World);
 
                 lastControllerRotation = currentRot;
             }
@@ -164,7 +166,6 @@ public class ItemSpawn : MonoBehaviour
         if (grab == null) grab = currentPreview.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
         grab.enabled = true;
 
-        // Set layer to Selectable so it can be selected later
         int selectableLayer = LayerMask.NameToLayer("Selectable");
         if (selectableLayer == -1) selectableLayer = 0;
         currentPreview.layer = selectableLayer;
